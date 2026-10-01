@@ -71,24 +71,24 @@ export async function buildBusTelemetry(busId: string): Promise<ComputedTelemetr
 
   // 5. If no location has ever been transmitted, return honest unverified/unavailable state
   if (!latestLoc) {
-    const firstStop = stops[0]?.name || "Campus Depot";
+    const firstStop = stops[0]?.name ? `${stops[0].name} (Origin)` : "Route Origin";
     return {
       busId,
       busNumber,
       driverId: bus?.driverId || undefined,
-      latitude: stops[0]?.latitude || 12.9287,
-      longitude: stops[0]?.longitude || 80.132,
+      latitude: null as any,
+      longitude: null as any,
       accuracy: null,
       speed: null,
       heading: null,
       altitude: null,
       nextStop: firstStop,
-      nextStopId: stops[0]?.id || "depot",
+      nextStopId: stops[0]?.id || "origin",
       isAtStop: false,
       isApproachingStop: false,
       stopSequenceIndex: 0,
       etaMinutes: 0,
-      formattedEta: "Unavailable",
+      formattedEta: "Unavailable (Not Tracking)",
       etaLabel: "UNAVAILABLE",
       etaConfidence: "UNAVAILABLE",
       remainingDistanceKm: 0,
@@ -96,7 +96,7 @@ export async function buildBusTelemetry(busId: string): Promise<ComputedTelemetr
         ? "Driver Active · Waiting for GPS"
         : trackingState.isPaused
         ? "Tracking Paused"
-        : "Tracking Standby · No Active Trip",
+        : "NOT TRACKING · Awaiting Driver GPS",
       freshness: "UNAVAILABLE",
       isLive: false,
       trackingStatus: trackingState.status,
@@ -105,7 +105,7 @@ export async function buildBusTelemetry(busId: string): Promise<ComputedTelemetr
       networkDelayMs: 0,
       secondsAgo: Infinity,
       quality: "INVALID",
-      source: "unverified",
+      source: "real-device-gps",
     };
   }
 

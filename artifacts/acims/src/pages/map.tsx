@@ -48,7 +48,7 @@ function MapCameraController({
   routeBounds, 
   followBus 
 }: { 
-  busPosition: [number, number]; 
+  busPosition: [number, number] | null; 
   routeBounds: [number, number][]; 
   followBus: boolean;
 }) {
@@ -137,24 +137,34 @@ export default function LiveMap() {
         { id: 'medical-sciences', name: 'Medical Sciences Center', sequence: 4, pathIndex: 24, latitude: 12.9372, longitude: 80.1396 },
       ];
 
-  // Current bus coordinate
-  const busPosition: [number, number] = location
+  // Current bus coordinate - ONLY when real live coordinates are available
+  const hasLiveBusGps = Boolean(
+    location &&
+    location.isLive &&
+    location.freshness !== 'UNAVAILABLE' &&
+    typeof location.latitude === 'number' &&
+    typeof location.longitude === 'number' &&
+    !isNaN(location.latitude) &&
+    !isNaN(location.longitude)
+  );
+
+  const busPosition: [number, number] | null = hasLiveBusGps
     ? [location.latitude, location.longitude]
-    : [stops[0].latitude, stops[0].longitude];
+    : null;
 
   // Traveled portion vs Remaining portion of route path
   const busPathIndex = location?.pathIndex ?? 0;
   const traveledPathCoords = useMemo(() => {
     const subset = path.slice(0, Math.min(path.length, busPathIndex + 1));
     const coords = subset.map((p) => [p.latitude, p.longitude] as [number, number]);
-    if (coords.length > 0) coords.push(busPosition);
+    if (coords.length > 0 && busPosition) coords.push(busPosition);
     return coords;
   }, [path, busPathIndex, busPosition]);
 
   const remainingPathCoords = useMemo(() => {
     const subset = path.slice(Math.max(0, busPathIndex));
     const coords = subset.map((p) => [p.latitude, p.longitude] as [number, number]);
-    if (coords.length > 0) coords.unshift(busPosition);
+    if (coords.length > 0 && busPosition) coords.unshift(busPosition);
     return coords;
   }, [path, busPathIndex, busPosition]);
 
@@ -446,7 +456,7 @@ export default function LiveMap() {
             </span>
             <span className="ml-auto flex items-center gap-1.5 text-muted-foreground">
               <Radio size={13} className="text-primary dark:text-accent" />
-              <span>{location?.source === 'driver-gps' ? 'Driver GPS Telemetry' : 'Route Simulation Engine'}</span>
+              <span>{hasLiveBusGps ? 'Driver GPS Telemetry (Live)' : 'Real Device GPS Awaiting Broadcast'}</span>
             </span>
           </div>
         </div>
@@ -560,7 +570,7 @@ function MapEngineVisualizer({
   stops: RouteStop[];
   traveledPath: [number, number][];
   remainingPath: [number, number][];
-  busPosition: [number, number];
+  busPosition: [number, number] | null;
   busNumber: string;
   location: any;
   routeBounds: [number, number][];
@@ -606,7 +616,7 @@ function MapEngineVisualizer({
 
   return (
     <MapContainer
-      center={busPosition}
+      center={busPosition || (stops[0] ? [stops[0].latitude, stops[0].longitude] : [13.0084, 80.0033])}
       zoom={14}
       scrollWheelZoom={false}
       className="h-[500px] min-h-[480px] w-full rounded-[22px]"
@@ -684,17 +694,19 @@ function MapEngineVisualizer({
         );
       })}
 
-      {/* Bus Marker */}
-      <Marker position={busPosition} icon={busIcon}>
-        <Tooltip direction="top" offset={[0, -22]} permanent={false}>
-          <div className="font-sans text-xs">
-            <strong>Bus #{busNumber}</strong>
-            <div>Heading to: {location?.destination || 'Terminal'}</div>
-            <div>Next: {location?.nextStop} ({location?.formattedEta || `${location?.etaMinutes} min`})</div>
-            <div className="text-[10px] text-slate-500">Source: {location?.source || 'simulation'}</div>
-          </div>
-        </Tooltip>
-      </Marker>
+      {/* Bus Marker - only rendered when physical driver GPS is actively transmitting */}
+      {busPosition && (
+        <Marker position={busPosition} icon={busIcon}>
+          <Tooltip direction="top" offset={[0, -22]} permanent={false}>
+            <div className="font-sans text-xs">
+              <strong>Bus #{busNumber}</strong>
+              <div>Heading to: {location?.destination || 'Terminal'}</div>
+              <div>Next: {location?.nextStop} ({location?.formattedEta || `${location?.etaMinutes} min`})</div>
+              <div className="text-[10px] text-slate-500">Source: Real Driver GPS</div>
+            </div>
+          </Tooltip>
+        </Marker>
+      )}
     </MapContainer>
   );
 }
